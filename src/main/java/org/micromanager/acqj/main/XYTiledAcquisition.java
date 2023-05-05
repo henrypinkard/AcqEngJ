@@ -16,6 +16,7 @@
 //
 package org.micromanager.acqj.main;
 
+import java.awt.geom.Point2D;
 import mmcorej.DeviceType;
 import mmcorej.org.json.JSONException;
 import mmcorej.org.json.JSONObject;
@@ -37,6 +38,7 @@ public class XYTiledAcquisition extends Acquisition implements XYTiledAcquisitio
 
    protected CameraTilingStageTranslator pixelStageTranslator_;
 
+   private final Point2D.Double tile00StagePosition_;
    private Integer overlapX_, overlapY_;
    Consumer<JSONObject> summaryMDAdder_;
 
@@ -55,7 +57,11 @@ public class XYTiledAcquisition extends Acquisition implements XYTiledAcquisitio
 
       createZDeviceModel(zStep);
       xyStage_ = core_.getXYStageDevice();
-
+      try {
+         tile00StagePosition_ = new Point2D.Double(core_.getXPosition(), core_.getYPosition());
+      } catch (Exception e) {
+         throw new RuntimeException(e);
+      }
       initialize();
    }
 
@@ -99,7 +105,8 @@ public class XYTiledAcquisition extends Acquisition implements XYTiledAcquisitio
       }
 
       pixelStageTranslator_ = new CameraTilingStageTranslator(AcqEngMetadata.getAffineTransform(getSummaryMetadata()), xyStage_,
-              (int) Engine.getCore().getImageWidth(), (int) Engine.getCore().getImageHeight(), overlapX_, overlapY_);
+              (int) Engine.getCore().getImageWidth(), (int) Engine.getCore().getImageHeight(), overlapX_, overlapY_,
+            tile00StagePosition_);
 
       if (dataSink_ != null) {
          //It could be null if not using saving and viewing and diverting with custom processor

@@ -23,8 +23,6 @@ import org.micromanager.acqj.internal.Engine;
  */
 public class CameraTilingStageTranslator {
 
-   //TODO: Much of this class could be removed, since position index is no longer a thing that is needed for
-   // tiled axes. They are now indexed by row and col axes
 
    private static final String COORDINATES_KEY = "DeviceCoordinatesUm";
    
@@ -32,9 +30,10 @@ public class CameraTilingStageTranslator {
    private String xyStageName_;
    private int tileWidth_, tileHeight_, displayTileHeight_, displayTileWidth_, overlapX_, overlapY_;
    private List<XYStagePosition> positionList_ = new ArrayList<XYStagePosition>();
+   private final Point2D.Double tile00Center_;
 
    public CameraTilingStageTranslator(AffineTransform transform, String xyStageName, int width,
-                                      int height, int overlapX, int overlapY) {
+                                      int height, int overlapX, int overlapY, Point2D.Double tile00Center) {
       affine_ = transform;
       xyStageName_ = xyStageName;
       tileWidth_ = width;
@@ -45,6 +44,7 @@ public class CameraTilingStageTranslator {
       displayTileHeight_ = tileHeight_ - overlapY_;
       overlapX_ = overlapX;
       overlapY_ = overlapY;
+      tile00Center_ = tile00Center;
    }
 
    public Point getTileIndicesFromDisplayedPixel(double magnification, int x, int y,
@@ -117,14 +117,10 @@ public class CameraTilingStageTranslator {
     * @return stage coordinates of the given pixel position
     */
    public synchronized Point2D.Double getStageCoordsFromPixelCoords(long xAbsolute, long yAbsolute) {
-      if (positionList_.size() == 0) {
-         throw new RuntimeException("No positions yet defined");
-      }
-      XYStagePosition existingPosition = positionList_.get(0);
-      double existingX = existingPosition.getCenter().x;
-      double existingY = existingPosition.getCenter().y;
-      double existingRow = existingPosition.getGridRow();
-      double existingColumn = existingPosition.getGridCol();
+      double existingX = tile00Center_.x;
+      double existingY = tile00Center_.y;
+      double existingRow = 0;
+      double existingColumn = 0;
       //get pixel displacement from center of the tile we have coordinates for
       long dxPix = (long) (xAbsolute - (existingColumn + 0.5) * displayTileWidth_);
       long dyPix = (long) (yAbsolute - (existingRow + 0.5) * displayTileHeight_);
@@ -143,12 +139,10 @@ public class CameraTilingStageTranslator {
     */
    public synchronized Point getPixelCoordsFromStageCoords(double stageX, double stageY) {
       try {
-         XYStagePosition existingPosition = positionList_.get(0);
-         double existingX = existingPosition.getCenter().x;
-         double existingY = existingPosition.getCenter().y;
-         double existingRow = existingPosition.getGridRow();
-         double existingColumn = existingPosition.getGridCol();
-
+         double existingX = tile00Center_.x;
+         double existingY = tile00Center_.y;
+         double existingRow = 0;
+         double existingColumn = 0;
          //get stage displacement from center of the tile we have coordinates for
          double dx = stageX - existingX;
          double dy = stageY - existingY;
@@ -203,30 +197,21 @@ public class CameraTilingStageTranslator {
     * @return
     */
    private synchronized Point2D.Double getStagePositionCoordinates(int row, int col, int pixelOverlapX, int pixelOverlapY) {
-      if (positionList_.size() == 0) {
-         try {
-            //create position 0 based on current XY stage position--happens at start of explore acquisition
-            return new Point2D.Double(Engine.getCore().getXPosition(xyStageName_), Engine.getCore().getYPosition(xyStageName_));
-         } catch (Exception ex) {
-            throw new RuntimeException("Couldn't create position 0");
-         }
-      } else {
-         XYStagePosition existingPosition = positionList_.get(0);
-         double existingX = existingPosition.getCenter().x;
-         double existingY = existingPosition.getCenter().y;
-         double existingRow = existingPosition.getGridRow();
-         double existingColumn = existingPosition.getGridCol();
+      double existingX = tile00Center_.x;
+      double existingY = tile00Center_.y;
+      double existingRow = 0;
+      double existingColumn = 0;
 
-         double xPixelOffset = (col - existingColumn) * (Engine.getCore().getImageWidth() - pixelOverlapX);
-         double yPixelOffset = (row - existingRow) * (Engine.getCore().getImageHeight() - pixelOverlapY);
+      double xPixelOffset = (col - existingColumn) * (Engine.getCore().getImageWidth() - pixelOverlapX);
+      double yPixelOffset = (row - existingRow) * (Engine.getCore().getImageHeight() - pixelOverlapY);
 
-         Point2D.Double stagePos = new Point2D.Double();
-         double[] mat = new double[4];
-         affine_.getMatrix(mat);
-         AffineTransform transform = new AffineTransform(mat[0], mat[1], mat[2], mat[3], existingX, existingY);
-         transform.transform(new Point2D.Double(xPixelOffset, yPixelOffset), stagePos);
-         return stagePos;
-      }
+      Point2D.Double stagePos = new Point2D.Double();
+      double[] mat = new double[4];
+      affine_.getMatrix(mat);
+      AffineTransform transform = new AffineTransform(mat[0], mat[1], mat[2], mat[3], existingX, existingY);
+      transform.transform(new Point2D.Double(xPixelOffset, yPixelOffset), stagePos);
+      return stagePos;
+
    }
 
    /**
